@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release --locked
+        env:
+          NIOS_APPS_VERSION: ${{ github.event.inputs.tag || github.ref_name }}
       - name: Checksum
         shell: pwsh
         run: |

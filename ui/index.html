@@ -33,6 +33,12 @@ dialog h2{margin:0 0 20px;font:600 22px/1.2 Unbounded,sans-serif}
 .btn.small{min-height:46px;padding:0 16px;font-size:16px}
 .setrow{display:flex;gap:10px;flex-wrap:wrap}
 .msg{margin:10px 0 0;font-size:15px;color:#3c4468}
+.update{background:#0a1030;color:#fff}
+.update-in{max-width:860px;margin:0 auto;padding:12px 28px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;font-size:16px}
+.update .btn{min-height:44px;padding:0 18px;font-size:16px}
+.update .link{color:#fff}
+.check{display:flex;align-items:center;gap:10px;font-weight:500;margin-bottom:10px}
+.check input{width:20px;height:20px;min-height:0;padding:0;accent-color:#1f3bff}
 main{max-width:860px;margin:0 auto;padding:36px 28px 56px}
 h1{margin:0 0 12px;font:600 clamp(26px,4vw,36px)/1.15 Unbounded,sans-serif;letter-spacing:-.025em}
 .lead{margin:0 0 32px;color:#3c4468;font-size:19px;max-width:38rem}
@@ -84,6 +90,12 @@ details input{margin-top:8px}
 <button class="gear" id="gear" type="button" aria-label="Настройки" title="Настройки"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
 </div>
 </div></header>
+
+<div class="update" id="update" hidden role="status" aria-live="polite"><div class="update-in">
+<span id="up-text"></span>
+<button class="btn primary" id="up-apply" type="button">Перезапустить и обновить</button>
+<button class="link" id="up-later" type="button">Позже</button>
+</div></div>
 
 <main>
 <h1>Запустите свой сервер в интернете</h1>
@@ -144,6 +156,13 @@ details input{margin-top:8px}
 <p class="hint">Через пробел, например: <code>requests pydantic</code>. Обычно не нужно: то, что вы импортируете в коде, ставится само.</p>
 </div>
 <div class="set">
+<label>Версия <span id="version"></span></label>
+<label class="check" for="auto-update"><input type="checkbox" id="auto-update"> Обновлять автоматически</label>
+<div class="setrow"><button class="btn line small" id="check-update" type="button">Проверить обновления</button></div>
+<p class="hint">Новая версия скачивается и проверяется по контрольной сумме, а ставится по вашей кнопке «Перезапустить и обновить» или при следующем запуске.</p>
+<p class="msg" id="up-msg" role="status"></p>
+</div>
+<div class="set">
 <label>Служебное</label>
 <div class="setrow"><button class="btn line small" id="open-data" type="button">Открыть папку данных</button><button class="btn line small" id="reset" type="button">Переустановить Python</button></div>
 <p class="msg" id="set-msg" role="status"></p>
@@ -183,6 +202,8 @@ details input{margin-top:8px}
   $("pkgs").value = init.packages || "";
   $("folder").value = init.folder || "";
   $("port").value = init.port || "";
+  $("version").textContent = init.version ? "v" + init.version.replace(/^v/, "") : "";
+  $("auto-update").checked = init.auto_update !== false;
 
   function view(next) {
     phase = next;
@@ -221,6 +242,13 @@ details input{margin-top:8px}
         break;
       case "setup": $("setup-step").textContent = m.message; log(m.message); break;
       case "log": log(m.message); break;
+      case "update_ready":
+        $("up-text").textContent = "Готова новая версия " + m.version + ". Сервер на время обновления остановится.";
+        $("update").hidden = false; $("up-msg").textContent = "Новая версия " + m.version + " готова. Нажмите «Перезапустить и обновить».";
+        break;
+      case "update_progress": $("up-msg").textContent = m.message; break;
+      case "update_none": if (m.manual) $("up-msg").textContent = "У вас последняя версия" + (m.version ? " (v" + m.version + ")" : "") + "."; break;
+      case "update_error": if (m.manual) $("up-msg").textContent = m.message || "Не удалось проверить обновления."; break;
       case "folder": $("folder").value = m.path; $("set-msg").textContent = ""; save(); break;
       case "reset_done":
         $("set-msg").textContent = m.ok ? "Готово. При следующем запуске Python и библиотеки скачаются заново." : (m.message || "Не получилось.");
@@ -250,6 +278,10 @@ details input{margin-top:8px}
   $("pick").onclick = () => send({ cmd: "pick_folder" });
   $("clear-folder").onclick = () => { $("folder").value = ""; save(); };
   $("open-data").onclick = () => send({ cmd: "open_data" });
+  $("auto-update").onchange = () => send({ cmd: "set_auto_update", value: $("auto-update").checked });
+  $("check-update").onclick = () => { $("up-msg").textContent = "Проверяем…"; send({ cmd: "check_update" }); };
+  $("up-apply").onclick = () => { $("up-text").textContent = "Обновляем и перезапускаем…"; send({ cmd: "apply_update" }); };
+  $("up-later").onclick = () => { $("update").hidden = true; };
   $("reset").onclick = () => { if (confirm("Удалить установленный Python и библиотеки? При следующем запуске они скачаются заново.")) send({ cmd: "reset_runtime" }); };
   $("code").addEventListener("keydown", (e) => {
     if (e.key === "Tab") { e.preventDefault(); const t = e.target, s = t.selectionStart; t.value = t.value.slice(0, s) + "    " + t.value.slice(t.selectionEnd); t.selectionStart = t.selectionEnd = s + 4; }

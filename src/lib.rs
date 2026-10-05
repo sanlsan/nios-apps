@@ -7,6 +7,8 @@ use std::thread;
 
 use serde_json::{json, Value};
 
+pub mod update;
+
 pub const RUNNER: &str = include_str!("../runner/runner.py");
 
 const PYTHON_VERSION: &str = "3.11.9";
@@ -61,13 +63,20 @@ impl Event {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Settings {
     pub key: String,
     pub code: String,
     pub packages: String,
     pub folder: String,
     pub port: String,
+    pub auto_update: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings { key: String::new(), code: String::new(), packages: String::new(), folder: String::new(), port: String::new(), auto_update: true }
+    }
 }
 
 impl Settings {
@@ -77,12 +86,19 @@ impl Settings {
         };
         let v: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
         let text = |name: &str| v.get(name).and_then(Value::as_str).unwrap_or("").to_string();
-        Settings { key: text("key"), code: text("code"), packages: text("packages"), folder: text("folder"), port: text("port") }
+        Settings {
+            key: text("key"),
+            code: text("code"),
+            packages: text("packages"),
+            folder: text("folder"),
+            port: text("port"),
+            auto_update: v.get("auto_update").and_then(Value::as_bool).unwrap_or(true),
+        }
     }
 
     pub fn save(&self, dir: &Path) {
         let _ = fs::create_dir_all(dir);
-        let body = json!({"key": self.key, "code": self.code, "packages": self.packages, "folder": self.folder, "port": self.port});
+        let body = json!({"key": self.key, "code": self.code, "packages": self.packages, "folder": self.folder, "port": self.port, "auto_update": self.auto_update});
         let _ = fs::write(dir.join("settings.json"), body.to_string());
     }
 }
@@ -184,7 +200,15 @@ pub fn patch_pth(content: &str) -> String {
     text
 }
 
-fn hide(cmd: &mut Command) -> &mut Command {
+pub fn curl_bin() -> &'static str {
+    if cfg!(windows) {
+        "curl.exe"
+    } else {
+        "curl"
+    }
+}
+
+pub(crate) fn hide(cmd: &mut Command) -> &mut Command {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -193,7 +217,7 @@ fn hide(cmd: &mut Command) -> &mut Command {
     cmd
 }
 
-fn run_checked(cmd: &mut Command, what: &str) -> Result<(), String> {
+pub(crate) fn run_checked(cmd: &mut Command, what: &str) -> Result<(), String> {
     let out = hide(cmd).output().map_err(|e| format!("{what}: не удалось запустить ({e})"))?;
     if out.status.success() {
         return Ok(());
@@ -455,10 +479,13 @@ mod tests {
     #[test]
     fn settings_roundtrip() {
         let dir = std::env::temp_dir().join(format!("niosapps-test-{}", std::process::id()));
-        let s = Settings { key: "k".into(), code: "print('привет')\n".into(), packages: "requests".into(), folder: "C:\\Мои проекты\\api".into(), port: "8123".into() };
+        let s = Settings { key: "k".into(), code: "print('привет')\n".into(), packages: "requests".into(), folder: "C:\\Мои проекты\\api".into(), port: "8123".into(), auto_update: false };
         s.save(&dir);
         assert_eq!(Settings::load(&dir), s);
         assert_eq!(Settings::load(&dir.join("missing")), Settings::default());
+        assert!(Settings::default().auto_update, "auto-update is on by default");
+        fs::write(dir.join("settings.json"), r#"{"key":"k"}"#).unwrap();
+        assert!(Settings::load(&dir).auto_update, "files without the field keep auto-update on");
         let _ = fs::remove_dir_all(&dir);
     }
 }

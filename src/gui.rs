@@ -1,10 +1,11 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use niosapps::update::{self, Update};
 use niosapps::{
     check_folder, data_dir, ensure_runtime, install_packages, normalize_key, normalize_port, parse_packages, reset_runtime,
     runtime_ready, Event, Runner, Settings,
@@ -24,7 +25,10 @@ static SESSION: AtomicU64 = AtomicU64::new(0);
 
 enum UserEvent {
     Js(String),
+    Quit,
 }
+
+static CHECKING: AtomicBool = AtomicBool::new(false);
 
 type SharedRunner = Arc<Mutex<Option<Runner>>>;
 
@@ -58,6 +62,49 @@ fn stop_runner(runner: &SharedRunner) {
     SESSION.fetch_add(1, Ordering::SeqCst);
     if let Some(mut running) = runner.lock().unwrap().take() {
         running.stop();
+    }
+}
+
+fn check_updates(dir: std::path::PathBuf, proxy: EventLoopProxy<UserEvent>, manual: bool) {
+    if CHECKING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    thread::spawn(move || {
+        let finish = |value: Value| {
+            push(&proxy, value);
+            CHECKING.store(false, Ordering::SeqCst);
+        };
+        if let Some(tag) = update::staged_version(&dir) {
+            return finish(json!({"t": "update_ready", "version": tag}));
+        }
+        match update::check() {
+            Ok(None) => finish(json!({"t": "update_none", "manual": manual, "version": update::current_version()})),
+            Ok(Some(found)) => download_update(&dir, &proxy, found, finish),
+            Err(message) => finish(json!({"t": "update_error", "manual": manual, "message": message})),
+        }
+    });
+}
+
+fn download_update(dir: &std::path::Path, proxy: &EventLoopProxy<UserEvent>, found: Update, finish: impl Fn(Value)) {
+    let report = |text: &str| push(proxy, json!({"t": "update_progress", "message": text}));
+    match update::download_and_stage(dir, &found, &report) {
+        Ok(()) => finish(json!({"t": "update_ready", "version": found.tag})),
+        Err(message) => finish(json!({"t": "update_error", "manual": true, "message": message})),
+    }
+}
+
+fn apply_update(dir: &std::path::Path, proxy: &EventLoopProxy<UserEvent>, runner: &SharedRunner) {
+    let Ok(exe) = std::env::current_exe() else {
+        return push(proxy, json!({"t": "update_error", "manual": true, "message": "Не удалось найти файл программы."}));
+    };
+    stop_runner(runner);
+    match update::apply_staged(dir, &exe) {
+        Ok(Some(_)) => {
+            update::relaunch(&exe);
+            let _ = proxy.send_event(UserEvent::Quit);
+        }
+        Ok(None) => push(proxy, json!({"t": "update_none", "manual": true, "version": update::current_version()})),
+        Err(message) => push(proxy, json!({"t": "update_error", "manual": true, "message": message})),
     }
 }
 
@@ -117,7 +164,8 @@ fn start(
             Ok(port) => port,
             Err(message) => return fail("input", message),
         };
-        Settings { key: key.clone(), code: code.clone(), packages: pkgs_raw, folder: folder.clone(), port: port.clone() }.save(&dir);
+        let auto_update = Settings::load(&dir).auto_update;
+        Settings { key: key.clone(), code: code.clone(), packages: pkgs_raw, folder: folder.clone(), port: port.clone(), auto_update }.save(&dir);
 
         if !runtime_ready(&dir) {
             push(&proxy, json!({"t": "setup_begin"}));
@@ -164,7 +212,17 @@ fn handle(body: &str, dir: &std::path::Path, proxy: &EventLoopProxy<UserEvent>, 
     let Ok(msg) = serde_json::from_str::<Value>(body) else { return };
     let text = |name: &str| msg.get(name).and_then(Value::as_str).unwrap_or("").to_string();
     match msg.get("cmd").and_then(Value::as_str) {
-        Some("save") => Settings { key: text("key"), code: text("code"), packages: text("packages"), folder: text("folder"), port: text("port") }.save(dir),
+        Some("save") => {
+            let auto_update = Settings::load(dir).auto_update;
+            Settings { key: text("key"), code: text("code"), packages: text("packages"), folder: text("folder"), port: text("port"), auto_update }.save(dir)
+        }
+        Some("set_auto_update") => {
+            let mut settings = Settings::load(dir);
+            settings.auto_update = msg.get("value").and_then(Value::as_bool).unwrap_or(true);
+            settings.save(dir);
+        }
+        Some("check_update") => check_updates(dir.to_path_buf(), proxy.clone(), true),
+        Some("apply_update") => apply_update(dir, proxy, runner),
         Some("start") => start(
             dir.to_path_buf(), proxy.clone(), runner.clone(), text("key"), text("code"), text("packages"), text("folder"), text("port"),
         ),
@@ -195,6 +253,13 @@ fn missing_webview(error: &dyn std::fmt::Display) {
 
 pub fn run() {
     let dir = data_dir();
+    if let Ok(exe) = std::env::current_exe() {
+        update::cleanup_old(&exe);
+        if let Ok(Some(_)) = update::apply_staged(&dir, &exe) {
+            update::relaunch(&exe);
+            return;
+        }
+    }
     let settings = Settings::load(&dir);
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
@@ -208,7 +273,8 @@ pub fn run() {
     let runner: SharedRunner = Arc::new(Mutex::new(None));
     let init = format!(
         "window.__init = {};",
-        json!({"key": settings.key, "code": settings.code, "packages": settings.packages, "folder": settings.folder, "port": settings.port})
+        json!({"key": settings.key, "code": settings.code, "packages": settings.packages, "folder": settings.folder, "port": settings.port,
+               "auto_update": settings.auto_update, "version": update::current_version()})
             .to_string()
             .replace('\u{2028}', "\\u2028")
             .replace('\u{2029}', "\\u2029")
@@ -226,11 +292,19 @@ pub fn run() {
         Err(error) => return missing_webview(&error),
     };
 
+    if settings.auto_update {
+        check_updates(dir.clone(), proxy.clone(), false);
+    }
+
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {
             TaoEvent::UserEvent(UserEvent::Js(script)) => {
                 let _ = webview.evaluate_script(&script);
+            }
+            TaoEvent::UserEvent(UserEvent::Quit) => {
+                stop_runner(&runner);
+                *control_flow = ControlFlow::Exit;
             }
             TaoEvent::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                 stop_runner(&runner);

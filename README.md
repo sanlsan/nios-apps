@@ -24,6 +24,12 @@ Settings (the gear icon): a project folder the code runs from (for your own modu
 
 Your code runs on your own computer with your own permissions. Run only code you trust. Libraries are installed from PyPI by import name, so check unfamiliar imports in code you did not write.
 
+## Updates
+
+The app updates itself. On start it checks the latest release of this repository, downloads `NiosApps.exe`, verifies its SHA-256 against the value published by GitHub for that release asset and keeps it ready. You apply it with **Перезапустить и обновить**, or it is applied on the next start. The old file is kept next to the program as `NiosApps.exe.old` until the next start. Downloads are accepted only from `github.com/sanlsan/nios-apps/releases/download/`, and a build is never replaced by an older one. Turn it off or check by hand in the settings (gear icon). People on a pre-release (`-rc`) follow the newest build, everyone else follows regular releases only.
+
+Command line: `NiosApps --check-update` prints whether a newer version exists, `NiosApps --self-update` downloads, verifies and swaps the file.
+
 ## Requirements
 
 Windows 10 (1803+) or 11, Microsoft Edge WebView2 (preinstalled on current Windows), internet access.
