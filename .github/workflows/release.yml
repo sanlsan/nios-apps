@@ -10,6 +10,11 @@ on:
 permissions:
   contents: write
 jobs:
+  apk:
+    uses: ./.github/workflows/android.yml
+    with:
+      version: ${{ github.event.inputs.tag || github.ref_name }}
+    secrets: inherit
   windows:
     runs-on: windows-latest
     steps:
@@ -32,3 +37,17 @@ jobs:
           files: |
             NiosApps.exe
             NiosApps.exe.sha256
+  publish-apk:
+    needs: apk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: NiosApps-apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          prerelease: ${{ contains(github.event.inputs.tag || github.ref_name, '-') }}
+          files: |
+            NiosApps.apk
+            NiosApps.apk.sha256

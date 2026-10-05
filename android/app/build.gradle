@@ -1,0 +1,93 @@
+plugins {
+    id "com.android.application"
+    id "com.chaquo.python"
+}
+
+def appVersion = (System.getenv("NIOS_APPS_VERSION") ?: "0.0.0-dev").replaceFirst("^v", "")
+def appCode = (System.getenv("NIOS_APPS_VERSION_CODE") ?: "1").toInteger()
+
+android {
+    namespace "ru.nios.apps"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "ru.nios.apps"
+        minSdk 24
+        targetSdk 34
+        versionCode appCode
+        versionName appVersion
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
+        }
+        buildConfigField "String", "REPO", "\"sanlsan/nios-apps\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        release {
+            def store = System.getenv("NIOS_KEYSTORE")
+            if (store) {
+                storeFile file(store)
+                storePassword System.getenv("NIOS_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("NIOS_KEY_ALIAS")
+                keyPassword System.getenv("NIOS_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv("NIOS_KEYSTORE") ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs += ["../../ui"]
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+        }
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        version "3.12"
+        pip {
+            install "fastapi==0.99.1"
+            install "pydantic<2"
+            install "uvicorn==0.30.6"
+            install "websockets"
+            install "h11"
+            install "click"
+            install "anyio<4"
+            install "sniffio"
+            install "idna"
+            install "starlette==0.27.0"
+            install "typing_extensions"
+            install "python-multipart"
+        }
+    }
+    sourceSets {
+        main {
+            srcDir "../../runner"
+            srcDir "../../client"
+        }
+    }
+}
+
+dependencies {
+}
