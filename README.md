@@ -17,10 +17,12 @@ The file is not code-signed, so Windows SmartScreen may warn: choose **More info
 ## What it does
 
 1. On first start it downloads the official Python 3.11 embeddable build from python.org and installs `fastapi`, `uvicorn` and [`nios-apps`](https://pypi.org/project/nios-apps/) from PyPI into `%LOCALAPPDATA%\NiosApps` (about a minute, once).
-2. It saves your code to `%LOCALAPPDATA%\NiosApps\user\main.py` and starts it with uvicorn on a free local port.
+2. It saves your code to `%LOCALAPPDATA%\NiosApps\user\main.py`, installs every third-party library the code imports (the import name is mapped to the PyPI name, for example `PIL` to `pillow`, `yaml` to `pyyaml`; a missing library found at run time is installed and the code is retried) and starts it with uvicorn on a free local port.
 3. `runner/runner.py` connects that port to Nios Apps with the `nios` client, so requests to your public address reach your PC.
 
-Your code runs on your own computer with your own permissions. Run only code you trust.
+Settings (the gear icon): a project folder the code runs from (for your own modules, templates, databases and files), a fixed local port, extra libraries to install by hand, open the data folder, reinstall Python.
+
+Your code runs on your own computer with your own permissions. Run only code you trust. Libraries are installed from PyPI by import name, so check unfamiliar imports in code you did not write.
 
 ## Requirements
 
@@ -40,7 +42,7 @@ The MSVC toolchain (Visual Studio Build Tools, "Desktop development with C++") i
 Run without a window (also works on Linux for development):
 
 ```
-NiosApps --headless --key nios_app_... --file main.py [--packages "requests pydantic"]
+NiosApps --headless --key nios_app_... --file main.py [--packages "requests pydantic"] [--folder DIR] [--port 8123]
 ```
 
 Tests: `cargo test --lib`.

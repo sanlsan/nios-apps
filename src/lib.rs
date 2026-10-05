@@ -49,6 +49,10 @@ impl Event {
         let text = |name: &str| v.get(name).and_then(Value::as_str).unwrap_or("").to_string();
         match v.get("t").and_then(Value::as_str) {
             Some("online") => Some(Event::Online(text("url"))),
+            Some("install") => {
+                let list: Vec<&str> = v.get("packages").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+                Some(Event::Setup(format!("Устанавливаем библиотеки: {}", list.join(", "))))
+            }
             Some("error") => Some(Event::Error { code: text("code"), message: text("message"), detail: text("detail") }),
             Some("log") => Some(Event::Log(text("message"))),
             Some(_) => None,
@@ -62,6 +66,8 @@ pub struct Settings {
     pub key: String,
     pub code: String,
     pub packages: String,
+    pub folder: String,
+    pub port: String,
 }
 
 impl Settings {
@@ -71,12 +77,12 @@ impl Settings {
         };
         let v: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
         let text = |name: &str| v.get(name).and_then(Value::as_str).unwrap_or("").to_string();
-        Settings { key: text("key"), code: text("code"), packages: text("packages") }
+        Settings { key: text("key"), code: text("code"), packages: text("packages"), folder: text("folder"), port: text("port") }
     }
 
     pub fn save(&self, dir: &Path) {
         let _ = fs::create_dir_all(dir);
-        let body = json!({"key": self.key, "code": self.code, "packages": self.packages});
+        let body = json!({"key": self.key, "code": self.code, "packages": self.packages, "folder": self.folder, "port": self.port});
         let _ = fs::write(dir.join("settings.json"), body.to_string());
     }
 }
@@ -113,6 +119,37 @@ pub fn normalize_key(raw: &str) -> Result<String, String> {
         return Err("Ключ выглядит неполным. Скопируйте его целиком, он начинается с nios_app_.".into());
     }
     Ok(key)
+}
+
+pub fn normalize_port(raw: &str) -> Result<String, String> {
+    let text = raw.trim();
+    if text.is_empty() {
+        return Ok(String::new());
+    }
+    match text.parse::<u32>() {
+        Ok(port) if (1024..=65535).contains(&port) => Ok(port.to_string()),
+        _ => Err("Порт должен быть числом от 1024 до 65535. Или оставьте поле пустым: тогда порт выберется сам.".into()),
+    }
+}
+
+pub fn check_folder(raw: &str) -> Result<String, String> {
+    let text = raw.trim();
+    if text.is_empty() {
+        return Ok(String::new());
+    }
+    if Path::new(text).is_dir() {
+        Ok(text.to_string())
+    } else {
+        Err(format!("Папка проекта не найдена: {text}. Выберите её заново в настройках (значок шестерёнки)."))
+    }
+}
+
+pub fn reset_runtime(dir: &Path) -> Result<(), String> {
+    let runtime = runtime_dir(dir);
+    if runtime.exists() {
+        fs::remove_dir_all(&runtime).map_err(|e| format!("Не удалось удалить {}: {e}", runtime.display()))?;
+    }
+    Ok(())
 }
 
 pub fn parse_packages(raw: &str) -> Result<Vec<String>, String> {
@@ -287,7 +324,7 @@ fn pump<R: Read + Send + 'static>(stream: R, tx: Sender<Event>, last: bool) {
 }
 
 impl Runner {
-    pub fn start(dir: &Path, key: &str, code: &str, tx: Sender<Event>) -> Result<Runner, String> {
+    pub fn start(dir: &Path, key: &str, code: &str, folder: &str, port: &str, tx: Sender<Event>) -> Result<Runner, String> {
         let user = dir.join("user");
         fs::create_dir_all(&user).map_err(|e| format!("Нет доступа к папке {}: {e}", user.display()))?;
         fs::write(user.join("main.py"), code).map_err(|e| e.to_string())?;
@@ -301,6 +338,8 @@ impl Runner {
             .env("NIOS_APP_KEY", key)
             .env("PYTHONUTF8", "1")
             .env("PYTHONIOENCODING", "utf-8")
+            .env("NIOS_PROJECT_DIR", folder)
+            .env("NIOS_LOCAL_PORT", port)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -383,12 +422,40 @@ mod tests {
         assert_eq!(Event::from_line("{broken"), Some(Event::Log("{broken".into())));
         assert_eq!(Event::from_line(r#"{"t":"local","port":1}"#), None);
         assert_eq!(Event::from_line(""), None);
+        assert_eq!(
+            Event::from_line(r#"{"t":"install","packages":["pillow","tomli-w"]}"#),
+            Some(Event::Setup("Устанавливаем библиотеки: pillow, tomli-w".into()))
+        );
+        assert_eq!(Event::from_line(r#"{"t":"install"}"#), Some(Event::Setup("Устанавливаем библиотеки: ".into())));
+    }
+
+    #[test]
+    fn port_and_folder() {
+        assert_eq!(normalize_port("").unwrap(), "");
+        assert_eq!(normalize_port("  8080 ").unwrap(), "8080");
+        assert!(normalize_port("80").is_err() && normalize_port("70000").is_err() && normalize_port("abc").is_err() && normalize_port("-1").is_err());
+        assert_eq!(check_folder("").unwrap(), "");
+        let here = std::env::temp_dir();
+        assert_eq!(check_folder(&here.to_string_lossy()).unwrap(), here.to_string_lossy());
+        assert!(check_folder("/definitely/not/here").unwrap_err().contains("не найдена"));
+    }
+
+    #[test]
+    fn reset_removes_runtime_only() {
+        let dir = std::env::temp_dir().join(format!("niosapps-reset-{}", std::process::id()));
+        fs::create_dir_all(runtime_dir(&dir)).unwrap();
+        fs::write(runtime_dir(&dir).join("x"), "1").unwrap();
+        fs::write(dir.join("settings.json"), "{}").unwrap();
+        reset_runtime(&dir).unwrap();
+        assert!(!runtime_dir(&dir).exists() && dir.join("settings.json").exists());
+        reset_runtime(&dir).unwrap();
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn settings_roundtrip() {
         let dir = std::env::temp_dir().join(format!("niosapps-test-{}", std::process::id()));
-        let s = Settings { key: "k".into(), code: "print('привет')\n".into(), packages: "requests".into() };
+        let s = Settings { key: "k".into(), code: "print('привет')\n".into(), packages: "requests".into(), folder: "C:\\Мои проекты\\api".into(), port: "8123".into() };
         s.save(&dir);
         assert_eq!(Settings::load(&dir), s);
         assert_eq!(Settings::load(&dir.join("missing")), Settings::default());

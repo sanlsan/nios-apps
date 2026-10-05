@@ -6,7 +6,7 @@ mod gui;
 use std::fs;
 use std::sync::mpsc;
 
-use niosapps::{data_dir, ensure_runtime, install_packages, normalize_key, parse_packages, Event, Runner};
+use niosapps::{check_folder, data_dir, ensure_runtime, install_packages, normalize_key, normalize_port, parse_packages, Event, Runner};
 
 fn arg(args: &[String], name: &str) -> Option<String> {
     args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned()
@@ -15,7 +15,7 @@ fn arg(args: &[String], name: &str) -> Option<String> {
 fn headless(args: &[String]) -> i32 {
     let say = |text: &str| println!("{text}");
     let Some(key_raw) = arg(args, "--key") else {
-        say("usage: NiosApps --headless --key KEY --file main.py [--packages \"a b\"]");
+        say("usage: NiosApps --headless --key KEY --file main.py [--packages \"a b\"] [--folder DIR] [--port N]");
         return 2;
     };
     let Some(file) = arg(args, "--file") else {
@@ -34,13 +34,21 @@ fn headless(args: &[String]) -> i32 {
         Ok(list) => list,
         Err(message) => return fail(&message),
     };
+    let folder = match check_folder(&arg(args, "--folder").unwrap_or_default()) {
+        Ok(folder) => folder,
+        Err(message) => return fail(&message),
+    };
+    let port = match normalize_port(&arg(args, "--port").unwrap_or_default()) {
+        Ok(port) => port,
+        Err(message) => return fail(&message),
+    };
     let dir = data_dir();
     let report = |text: &str| println!("{}", Event::Setup(text.into()).to_json());
     if let Err(message) = ensure_runtime(&dir, &report).and_then(|_| install_packages(&dir, &packages, &report)) {
         return fail(&message);
     }
     let (tx, rx) = mpsc::channel();
-    let _runner = match Runner::start(&dir, &key, &code, tx) {
+    let _runner = match Runner::start(&dir, &key, &code, &folder, &port, tx) {
         Ok(runner) => runner,
         Err(message) => return fail(&message),
     };

@@ -18,6 +18,21 @@ button,input,textarea{font:inherit;color:inherit}
 .brand{display:inline-flex;align-items:center;gap:12px;font:600 22px/1 Unbounded,sans-serif;letter-spacing:-.01em}
 .pill{display:inline-flex;align-items:center;height:24px;padding:0 9px;border:1.5px solid #fff;border-radius:6px;font:600 13px/1 "Golos Text",sans-serif}
 .toplink{color:#fff;font-weight:500;font-size:15px;background:none;border:0;cursor:pointer;text-decoration:underline;text-underline-offset:4px}
+.top-actions{display:flex;align-items:center;gap:18px}
+.gear{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border:2px solid #fff;border-radius:8px;background:none;color:#fff;cursor:pointer}
+.gear:hover{background:rgba(255,255,255,.14)}
+.gear svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+dialog{width:min(560px,calc(100% - 32px));border:0;border-radius:8px;padding:28px;color:#0a1030;background:#fff}
+dialog::backdrop{background:rgba(10,16,48,.7)}
+dialog h2{margin:0 0 20px;font:600 22px/1.2 Unbounded,sans-serif}
+.set{margin-bottom:22px}
+.set label{margin-bottom:6px}
+.pickrow{display:flex;gap:10px;flex-wrap:wrap}
+.pickrow input{flex:1 1 220px;min-width:0;background:#eef1ff}
+.pickrow .btn{min-height:54px;padding:0 18px;font-size:16px}
+.btn.small{min-height:46px;padding:0 16px;font-size:16px}
+.setrow{display:flex;gap:10px;flex-wrap:wrap}
+.msg{margin:10px 0 0;font-size:15px;color:#3c4468}
 main{max-width:860px;margin:0 auto;padding:36px 28px 56px}
 h1{margin:0 0 12px;font:600 clamp(26px,4vw,36px)/1.15 Unbounded,sans-serif;letter-spacing:-.025em}
 .lead{margin:0 0 32px;color:#3c4468;font-size:19px;max-width:38rem}
@@ -64,7 +79,10 @@ details input{margin-top:8px}
 <body>
 <header class="top"><div class="top-row">
 <div class="brand">Nios Apps<span class="pill">для Windows</span></div>
+<div class="top-actions">
 <button class="toplink" id="cabinet" type="button">Мои приложения на ni-os.ru</button>
+<button class="gear" id="gear" type="button" aria-label="Настройки" title="Настройки"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+</div>
 </div></header>
 
 <main>
@@ -81,14 +99,8 @@ details input{margin-top:8px}
 <div class="step">
 <label for="code"><b>2.</b>Код сервера на FastAPI</label>
 <textarea id="code" spellcheck="false" autocomplete="off"></textarea>
-<p class="hint">Достаточно одного файла. В коде должна быть переменная <code>app = FastAPI()</code>. <button class="link" id="sample" type="button">Вставить пример</button></p>
+<p class="hint">Достаточно одного файла. В коде должна быть переменная <code>app = FastAPI()</code>. Библиотеки из <code>import</code> программа скачает сама. <button class="link" id="sample" type="button">Вставить пример</button></p>
 </div>
-
-<details>
-<summary>Нужны дополнительные библиотеки?</summary>
-<label for="pkgs">Названия через пробел, например: requests pydantic</label>
-<input id="pkgs" autocomplete="off" spellcheck="false">
-</details>
 
 <p class="err" id="err" role="alert" hidden></p>
 <button class="btn primary wide" id="go" type="button">Запустить</button>
@@ -113,6 +125,31 @@ details input{margin-top:8px}
 <button class="btn line" id="stop" type="button">Остановить</button>
 </div>
 </section>
+
+<dialog id="settings" aria-labelledby="set-title">
+<h2 id="set-title">Настройки</h2>
+<div class="set">
+<label for="folder">Папка проекта</label>
+<div class="pickrow"><input id="folder" readonly placeholder="Не выбрана"><button class="btn line small" id="pick" type="button">Выбрать</button><button class="btn line small" id="clear-folder" type="button">Сбросить</button></div>
+<p class="hint">Нужна, если в коде используются ваши файлы (шаблоны, базы, картинки) или свои модули. Код запустится из этой папки.</p>
+</div>
+<div class="set">
+<label for="port">Порт на этом компьютере</label>
+<input id="port" inputmode="numeric" autocomplete="off" maxlength="5">
+<p class="hint">Обычно не нужен: программа выберет свободный порт сама. Заполните, если сервер должен быть доступен локально по одному и тому же адресу.</p>
+</div>
+<div class="set">
+<label for="pkgs">Дополнительные библиотеки</label>
+<input id="pkgs" autocomplete="off" spellcheck="false">
+<p class="hint">Через пробел, например: <code>requests pydantic</code>. Обычно не нужно: то, что вы импортируете в коде, ставится само.</p>
+</div>
+<div class="set">
+<label>Служебное</label>
+<div class="setrow"><button class="btn line small" id="open-data" type="button">Открыть папку данных</button><button class="btn line small" id="reset" type="button">Переустановить Python</button></div>
+<p class="msg" id="set-msg" role="status"></p>
+</div>
+<button class="btn primary" id="set-close" type="button">Готово</button>
+</dialog>
 
 <details id="logbox"><summary>Что происходит</summary><pre id="log"></pre></details>
 </main>
@@ -144,6 +181,8 @@ details input{margin-top:8px}
   $("key").value = init.key || "";
   $("code").value = init.code || SAMPLE;
   $("pkgs").value = init.packages || "";
+  $("folder").value = init.folder || "";
+  $("port").value = init.port || "";
 
   function view(next) {
     phase = next;
@@ -160,7 +199,8 @@ details input{margin-top:8px}
     if (rows.length > 400) pre.textContent = rows.slice(-300).join("\n");
     pre.scrollTop = pre.scrollHeight;
   }
-  function save() { send({ cmd: "save", key: $("key").value, code: $("code").value, packages: $("pkgs").value }); }
+  const fields = () => ({ key: $("key").value, code: $("code").value, packages: $("pkgs").value, folder: $("folder").value, port: $("port").value });
+  function save() { send({ cmd: "save", ...fields() }); }
 
   function start() {
     showError("");
@@ -169,7 +209,7 @@ details input{margin-top:8px}
     $("setup-note").textContent = "Подождите несколько секунд.";
     $("setup-step").textContent = "";
     view("starting");
-    send({ cmd: "start", key: $("key").value, code: $("code").value, packages: $("pkgs").value });
+    send({ cmd: "start", ...fields() });
   }
   function stop() { send({ cmd: "stop" }); url = ""; view("idle"); }
 
@@ -181,6 +221,10 @@ details input{margin-top:8px}
         break;
       case "setup": $("setup-step").textContent = m.message; log(m.message); break;
       case "log": log(m.message); break;
+      case "folder": $("folder").value = m.path; $("set-msg").textContent = ""; save(); break;
+      case "reset_done":
+        $("set-msg").textContent = m.ok ? "Готово. При следующем запуске Python и библиотеки скачаются заново." : (m.message || "Не получилось.");
+        break;
       case "online":
         url = m.url; $("addr").textContent = url; view("online"); break;
       case "error":
@@ -198,7 +242,15 @@ details input{margin-top:8px}
   $("copy").onclick = () => { send({ cmd: "copy", text: url }); $("copy").textContent = "Скопировано"; setTimeout(() => { $("copy").textContent = "Скопировать адрес"; }, 2000); };
   $("open").onclick = () => send({ cmd: "open", url });
   $("cabinet").onclick = $("cabinet2").onclick = () => send({ cmd: "open", url: "https://ni-os.ru/appsdev" });
-  ["key", "code", "pkgs"].forEach((id) => $(id).addEventListener("change", save));
+  ["key", "code", "pkgs", "port"].forEach((id) => $(id).addEventListener("change", save));
+  const dialog = $("settings");
+  $("gear").onclick = () => { $("set-msg").textContent = ""; dialog.showModal(); };
+  $("set-close").onclick = () => { save(); dialog.close(); };
+  dialog.addEventListener("close", save);
+  $("pick").onclick = () => send({ cmd: "pick_folder" });
+  $("clear-folder").onclick = () => { $("folder").value = ""; save(); };
+  $("open-data").onclick = () => send({ cmd: "open_data" });
+  $("reset").onclick = () => { if (confirm("Удалить установленный Python и библиотеки? При следующем запуске они скачаются заново.")) send({ cmd: "reset_runtime" }); };
   $("code").addEventListener("keydown", (e) => {
     if (e.key === "Tab") { e.preventDefault(); const t = e.target, s = t.selectionStart; t.value = t.value.slice(0, s) + "    " + t.value.slice(t.selectionEnd); t.selectionStart = t.selectionEnd = s + 4; }
   });
