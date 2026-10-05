@@ -54,6 +54,8 @@ Tests: `cargo test --lib`.
 
 ## Releasing (maintainers)
 
-Push a tag `v0.1.0`: the `release` workflow builds the exe, attaches it to a GitHub release and, if the `NIOS_UPLOAD_TOKEN` secret is set, publishes it to ni-os.ru. Protect `v*` tags and treat that secret as a production credential.
+GitHub builds and publishes everything, no local tools needed. Either push a tag (`git tag v0.1.1 && git push origin v0.1.1`) or open **Actions, release, Run workflow** and type the version. The `release` workflow builds `NiosApps.exe` on Windows and attaches it with its SHA-256 to a GitHub release.
+
+A version with a dash (`v0.2.0-rc1`) is a pre-release. [ni-os.ru/appsdev](https://ni-os.ru/appsdev) links to the latest regular release only, so test a pre-release first and publish a plain `v0.2.0` when it works.
 
 License: MIT. See `NOTICE` for fonts.
