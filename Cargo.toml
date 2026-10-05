@@ -1,0 +1,27 @@
+[package]
+name = "nios-apps-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "Nios Apps for Windows: paste a key and FastAPI code, press Run"
+
+[lib]
+name = "niosapps"
+path = "src/lib.rs"
+
+[[bin]]
+name = "NiosApps"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[target."cfg(windows)".dependencies]
+tao = "0.37.1"
+wry = "0.57.0"

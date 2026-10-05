@@ -1,0 +1,6 @@
+target/
+dist/
+*.exe
+upload.key
+settings.json
+.env

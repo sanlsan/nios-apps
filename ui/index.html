@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nios Apps</title>
+<style>
+/*FONTS*/
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{font-family:"Golos Text",ui-sans-serif,"Segoe UI",sans-serif;color:#0a1030;background:#fff;-webkit-font-smoothing:antialiased;font-size:17px;line-height:1.5}
+[hidden]{display:none!important}
+a{color:#1f3bff}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid #ff5a36;outline-offset:2px}
+.top{background:#1f3bff;color:#fff}
+.top-row{max-width:860px;margin:0 auto;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:inline-flex;align-items:center;gap:12px;font:600 22px/1 Unbounded,sans-serif;letter-spacing:-.01em}
+.pill{display:inline-flex;align-items:center;height:24px;padding:0 9px;border:1.5px solid #fff;border-radius:6px;font:600 13px/1 "Golos Text",sans-serif}
+.toplink{color:#fff;font-weight:500;font-size:15px;background:none;border:0;cursor:pointer;text-decoration:underline;text-underline-offset:4px}
+main{max-width:860px;margin:0 auto;padding:36px 28px 56px}
+h1{margin:0 0 12px;font:600 clamp(26px,4vw,36px)/1.15 Unbounded,sans-serif;letter-spacing:-.025em}
+.lead{margin:0 0 32px;color:#3c4468;font-size:19px;max-width:38rem}
+.step{margin-bottom:24px}
+label{display:block;margin-bottom:8px;font-weight:600}
+label b{font-family:Unbounded,sans-serif;font-weight:600;margin-right:6px}
+input,textarea{width:100%;border:2px solid #cfd6ff;border-radius:8px;background:#fff;padding:0 14px}
+input{min-height:54px;font-size:17px}
+textarea{min-height:250px;padding:14px;font:15px/1.6 ui-monospace,Consolas,"Cascadia Mono",monospace;resize:vertical;tab-size:4}
+input:focus,textarea:focus{border-color:#1f3bff;outline:none}
+.hint{margin:8px 0 0;font-size:15px;color:#3c4468}
+code{background:#eef1ff;padding:1px 6px;border-radius:4px;font:.92em ui-monospace,Consolas,monospace}
+.link{background:none;border:0;padding:0;color:#1f3bff;text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:15px}
+details{margin:0 0 24px}
+summary{cursor:pointer;font-weight:600;padding:6px 0}
+details input{margin-top:8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:56px;padding:0 30px;border-radius:8px;border:2px solid transparent;font-weight:600;font-size:18px;cursor:pointer;background:none}
+.btn.primary{background:#ff5a36;border-color:#ff5a36;color:#0a1030}
+.btn.primary:hover{background:#ff6d4d}
+.btn.line{border-color:currentColor}
+.btn:disabled{opacity:.6;cursor:default}
+.btn.wide{width:100%}
+.err{margin:0 0 20px;padding:14px 16px;border-radius:8px;background:#eef1ff;border:2px solid #ff5a36;font-size:17px}
+.panel{background:#0a1030;color:#fff;border-radius:8px;padding:28px}
+.panel h2{margin:0 0 6px;font:600 clamp(22px,3vw,28px)/1.2 Unbounded,sans-serif}
+.panel p{margin:0 0 20px;color:#b9c0e0}
+.status{display:inline-flex;align-items:center;gap:10px;font-weight:600;margin-bottom:14px}
+.dot{width:12px;height:12px;border-radius:50%;background:#ff5a36}
+.dot.on{background:#fff}
+.addr{display:block;width:100%;margin:6px 0 18px;padding:16px;border-radius:8px;background:#1f3bff;color:#fff;font:600 clamp(16px,2.4vw,22px)/1.3 ui-monospace,Consolas,monospace;overflow-wrap:anywhere;user-select:all}
+.row{display:flex;flex-wrap:wrap;gap:12px}
+.panel .btn.line{color:#fff}
+.bar{height:8px;border-radius:4px;background:#e3e8ff;overflow:hidden;margin:18px 0 6px}
+.bar i{display:block;height:100%;width:35%;background:#1f3bff;animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+@media (prefers-reduced-motion:reduce){.bar i{animation:none;width:100%}}
+.setup h2{margin:0 0 8px;font:600 clamp(22px,3vw,28px)/1.2 Unbounded,sans-serif}
+.setup p{margin:0 0 6px;color:#3c4468}
+#setup-step{font-weight:600;color:#0a1030}
+#logbox{margin-top:28px}
+#log{margin:8px 0 0;padding:14px;background:#0a1030;color:#e3e8ff;border-radius:8px;max-height:240px;overflow:auto;font:13.5px/1.55 ui-monospace,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-row">
+<div class="brand">Nios Apps<span class="pill">для Windows</span></div>
+<button class="toplink" id="cabinet" type="button">Мои приложения на ni-os.ru</button>
+</div></header>
+
+<main>
+<h1>Запустите свой сервер в интернете</h1>
+<p class="lead">Вставьте ключ, вставьте код, нажмите «Запустить». Остальное приложение сделает само.</p>
+
+<section id="form">
+<div class="step">
+<label for="key"><b>1.</b>Ключ приложения</label>
+<input id="key" autocomplete="off" spellcheck="false">
+<p class="hint">Ключ показывается один раз при создании приложения в кабинете <button class="link" id="cabinet2" type="button">ni-os.ru/appsdev</button>.</p>
+</div>
+
+<div class="step">
+<label for="code"><b>2.</b>Код сервера на FastAPI</label>
+<textarea id="code" spellcheck="false" autocomplete="off"></textarea>
+<p class="hint">Достаточно одного файла. В коде должна быть переменная <code>app = FastAPI()</code>. <button class="link" id="sample" type="button">Вставить пример</button></p>
+</div>
+
+<details>
+<summary>Нужны дополнительные библиотеки?</summary>
+<label for="pkgs">Названия через пробел, например: requests pydantic</label>
+<input id="pkgs" autocomplete="off" spellcheck="false">
+</details>
+
+<p class="err" id="err" role="alert" hidden></p>
+<button class="btn primary wide" id="go" type="button">Запустить</button>
+</section>
+
+<section id="setup" class="setup" hidden aria-live="polite">
+<h2 id="setup-title">Запускаем</h2>
+<p id="setup-note">Подождите несколько секунд.</p>
+<div class="bar"><i></i></div>
+<p id="setup-step"></p>
+<div class="row" style="margin-top:20px"><button class="btn line" id="cancel" type="button">Отмена</button></div>
+</section>
+
+<section id="live" class="panel" hidden aria-live="polite">
+<div class="status"><span class="dot on"></span><span>Работает</span></div>
+<h2>Ваш сервер доступен по адресу</h2>
+<p>Отправьте этот адрес кому угодно. Пока окно открыто, он работает.</p>
+<span class="addr" id="addr"></span>
+<div class="row">
+<button class="btn primary" id="copy" type="button">Скопировать адрес</button>
+<button class="btn line" id="open" type="button">Открыть в браузере</button>
+<button class="btn line" id="stop" type="button">Остановить</button>
+</div>
+</section>
+
+<details id="logbox"><summary>Что происходит</summary><pre id="log"></pre></details>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const send = (msg) => window.ipc.postMessage(JSON.stringify(msg));
+  const init = window.__init || {};
+  const SAMPLE = [
+    "from fastapi import FastAPI",
+    "",
+    "app = FastAPI()",
+    "",
+    "",
+    "@app.get(\"/\")",
+    "def index():",
+    "    return {\"hello\": \"world\"}",
+    "",
+    "",
+    "@app.get(\"/hi/{name}\")",
+    "def hi(name: str):",
+    "    return {\"message\": \"Привет, \" + name}",
+    ""
+  ].join("\n");
+  let url = "";
+  let phase = "idle";
+
+  $("key").value = init.key || "";
+  $("code").value = init.code || SAMPLE;
+  $("pkgs").value = init.packages || "";
+
+  function view(next) {
+    phase = next;
+    $("form").hidden = next !== "idle";
+    $("setup").hidden = next !== "starting";
+    $("live").hidden = next !== "online";
+  }
+  function showError(text) { const e = $("err"); e.textContent = text; e.hidden = !text; }
+  function log(line) {
+    const pre = $("log");
+    const clean = String(line).replace(/^(INFO|WARNING|ERROR):\s+/, "").slice(0, 400);
+    pre.textContent += clean + "\n";
+    const rows = pre.textContent.split("\n");
+    if (rows.length > 400) pre.textContent = rows.slice(-300).join("\n");
+    pre.scrollTop = pre.scrollHeight;
+  }
+  function save() { send({ cmd: "save", key: $("key").value, code: $("code").value, packages: $("pkgs").value }); }
+
+  function start() {
+    showError("");
+    $("log").textContent = "";
+    $("setup-title").textContent = "Запускаем";
+    $("setup-note").textContent = "Подождите несколько секунд.";
+    $("setup-step").textContent = "";
+    view("starting");
+    send({ cmd: "start", key: $("key").value, code: $("code").value, packages: $("pkgs").value });
+  }
+  function stop() { send({ cmd: "stop" }); url = ""; view("idle"); }
+
+  window.onNative = (m) => {
+    switch (m.t) {
+      case "setup_begin":
+        $("setup-title").textContent = "Готовим всё необходимое";
+        $("setup-note").textContent = "Это нужно один раз, обычно около минуты. Окно не закрывайте.";
+        break;
+      case "setup": $("setup-step").textContent = m.message; log(m.message); break;
+      case "log": log(m.message); break;
+      case "online":
+        url = m.url; $("addr").textContent = url; view("online"); break;
+      case "error":
+        view("idle"); showError(m.message || "Не удалось запустить."); if (m.detail) log(m.detail); break;
+      case "stopped":
+        if (phase === "online") { view("idle"); showError("Сервер остановился. Проверьте журнал внизу и запустите снова."); }
+        break;
+    }
+  };
+
+  $("go").onclick = start;
+  $("cancel").onclick = stop;
+  $("stop").onclick = stop;
+  $("sample").onclick = () => { $("code").value = SAMPLE; save(); };
+  $("copy").onclick = () => { send({ cmd: "copy", text: url }); $("copy").textContent = "Скопировано"; setTimeout(() => { $("copy").textContent = "Скопировать адрес"; }, 2000); };
+  $("open").onclick = () => send({ cmd: "open", url });
+  $("cabinet").onclick = $("cabinet2").onclick = () => send({ cmd: "open", url: "https://ni-os.ru/appsdev" });
+  ["key", "code", "pkgs"].forEach((id) => $(id).addEventListener("change", save));
+  $("code").addEventListener("keydown", (e) => {
+    if (e.key === "Tab") { e.preventDefault(); const t = e.target, s = t.selectionStart; t.value = t.value.slice(0, s) + "    " + t.value.slice(t.selectionEnd); t.selectionStart = t.selectionEnd = s + 4; }
+  });
+})();
+</script>
+</body>
+</html>

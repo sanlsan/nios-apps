@@ -1,0 +1,33 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      NIOS_UPLOAD_TOKEN: ${{ secrets.NIOS_UPLOAD_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+      - name: Checksum
+        shell: pwsh
+        run: |
+          Copy-Item target/release/NiosApps.exe NiosApps.exe
+          $hash = (Get-FileHash NiosApps.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  NiosApps.exe" | Out-File -Encoding ascii NiosApps.exe.sha256
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            NiosApps.exe
+            NiosApps.exe.sha256
+      - name: Publish to ni-os.ru
+        if: env.NIOS_UPLOAD_TOKEN != ''
+        shell: bash
+        run: |
+          curl --fail --silent --show-error -X PUT -T NiosApps.exe \
+            -H "Authorization: Bearer $NIOS_UPLOAD_TOKEN" \
+            https://ni-os.ru/appsdev/api/upload/exe
